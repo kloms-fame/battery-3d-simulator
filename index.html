@@ -4,35 +4,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Battery Pack 3D Simulator</title>
+  <title>Battery Pack 3D Digital Twin</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 
 <body>
   <div id="canvas-container"></div>
 
-  <div id="ui-panel">
-    <h1 class="brand">⚡ PACK SIMULATOR 3D</h1>
-    <p class="subtitle">Digital Twin Engine</p>
-
-    <div class="control-group">
-      <label for="file-upload" class="custom-file-upload">
-        📂 导入 Easy_Battery_Tool JSON
-      </label>
-      <input id="file-upload" type="file" accept=".json" />
+  <div id="left-panel" class="panel">
+    <div class="panel-header" id="toggle-left-panel">
+      <h1 class="brand">⚡ PACK SIMULATOR 3D</h1>
+      <span class="toggle-icon">▼</span>
     </div>
+    <div class="panel-content" id="left-panel-content">
+      <p class="subtitle">Digital Twin Engine</p>
+      <div class="control-group">
+        <label for="file-upload" class="custom-file-upload">📂 导入 CAD JSON 工程</label>
+        <input id="file-upload" type="file" accept=".json" />
+      </div>
 
-    <div id="stats-display" class="stats-box">
-      等待导入模型...
+      <div class="control-group slider-group">
+        <label>💡 场景全局亮度: <span id="bright-val">100%</span></label>
+        <input type="range" id="slider-brightness" min="0" max="200" value="100" />
+      </div>
+
+      <div id="stats-display" class="stats-box">等待导入模型...</div>
     </div>
   </div>
 
-  <div id="multimeter-ui" class="hidden">
-    <div class="lcd-screen">
-      <span class="lcd-mode">DC Voltage</span>
-      <span class="lcd-value" id="lcd-v">0.00</span> <span class="lcd-unit">V</span>
+  <div id="layer-panel" class="panel">
+    <div class="panel-header">
+      <h3>🗂️ 3D 图层控制</h3>
     </div>
-    <div class="probe-status">请使用探针点击电芯极耳</div>
+    <div class="panel-content">
+      <label class="layer-toggle"><input type="checkbox" id="layer-cells" checked /> 🔋 电芯主体 (Cells)</label>
+      <label class="layer-toggle"><input type="checkbox" id="layer-busbars" checked /> ⚡ 金属镍片 (Busbars)</label>
+      <label class="layer-toggle"><input type="checkbox" id="layer-bms" checked /> 🧵 BMS 飞线 (Wiring)</label>
+      <label class="layer-toggle"><input type="checkbox" id="layer-labels" checked /> 🏷️ 空间编号 (Labels)</label>
+    </div>
+  </div>
+
+  <div id="multimeter-ui" class="panel hidden">
+    <div class="panel-header" style="border-bottom:none; padding-bottom:0;">
+      <h3 style="color:#fbbf24;">📟 虚拟万用表与信息终端</h3>
+    </div>
+    <div class="panel-content">
+      <div class="lcd-screen">
+        <span class="lcd-mode">DC Voltage (拓扑测算)</span>
+        <span class="lcd-value" id="lcd-v">0.00</span> <span class="lcd-unit">V</span>
+      </div>
+      <div class="probe-status" id="probe-status">请使用鼠标点击电芯极耳放置探针</div>
+
+      <div id="cell-info-box" class="cell-info hidden">
+        <div class="info-row"><span>当前选中 ID:</span> <strong id="info-id" style="color:#38bdf8;">--</strong></div>
+        <div class="info-row"><span>物理极性:</span> <strong id="info-pol">--</strong></div>
+        <div class="info-row"><span>标称电压:</span> <strong id="info-v">--</strong></div>
+        <div class="info-row"><span>内阻估算:</span> <strong id="info-r">--</strong></div>
+      </div>
+    </div>
+    <button id="btn-reset-probes" class="reset-btn">🔄 收回探针</button>
   </div>
 
   <script type="module" src="/src/main.ts"></script>
