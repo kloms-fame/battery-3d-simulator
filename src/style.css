@@ -235,3 +235,141 @@ input[type="range"] {
 .hidden {
   display: none !important;
 }
+
+/* 🌟 新增功能样式 */
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.action-btn {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: var(--accent-blue);
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: 0.2s;
+}
+
+.action-btn:hover {
+  background: var(--accent-blue);
+  color: var(--bg-dark);
+}
+
+.action-btn.active {
+  background: #10b981;
+  border-color: #059669;
+  color: white;
+}
+
+
+/* 🌟 FAB 向上弹射气泡菜单 */
+.fab-container {
+  position: absolute;
+  bottom: 25px;
+  right: 25px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+}
+
+.fab-main {
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: #27272a;
+  border: 2px solid #38bdf8;
+  color: white;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s;
+  z-index: 21;
+}
+
+.fab-main:hover {
+  transform: scale(1.1);
+  background: #38bdf8;
+}
+
+.fab-menu {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  margin-bottom: 15px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(20px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-container.open .fab-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.fab-item {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  color: white;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.fab-item:hover {
+  background: #334155;
+  transform: scale(1.1);
+}
+
+.fab-item.active {
+  background: #fbbf24;
+  border-color: #f59e0b;
+  color: black;
+}
+
+/* 🌟 可任意拖拽和缩放的面板 */
+.draggable-panel {
+  position: absolute;
+  bottom: 95px;
+  right: 25px;
+  width: 320px;
+  border-color: #fbbf24;
+  resize: both;
+  /* 允许右下角原生拉伸缩放 */
+  overflow: auto;
+  /* 配合 resize 使用 */
+  transition: opacity 0.3s;
+  /* 去除 transform transition，防止拖拽卡顿 */
+}
+
+.drag-handle {
+  cursor: grab;
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  background: rgba(251, 191, 36, 0.3);
+}
+
+#multimeter-ui.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
