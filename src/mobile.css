@@ -119,42 +119,98 @@
     }
 
     /* 5. 核心：拖拽面板变身“现代化底部模态框 (Bottom Sheet)” */
-    /* 🌟 修复 1：释放头部点击权限，找回关闭按钮 */
-    .drag-handle {
-        pointer-events: auto !important;
+    /* 🌟 优化面板头部：将关闭按钮移到左边，标题移到右边 */
+    .panel-header {
+        display: flex !important;
+        flex-direction: row-reverse !important;
+        /* 核心：左右对调 */
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 12px 15px !important;
+        background: rgba(255, 255, 255, 0.03) !important;
     }
 
-    /* 🌟 专门为手机端优化的“✖”关闭按钮 */
+    .drag-handle {
+        pointer-events: auto !important;
+        touch-action: none !important;
+        /* 核心：让JS接管移动端拖拽，禁止系统默认滚动 */
+    }
+
+    /* 🌟 重新定义左侧关闭按钮 */
     .close-btn {
-        display: block !important;
-        font-size: 24px !important;
-        /* 放大触控面积，防误触 */
-        padding: 5px 15px !important;
-        margin-right: -10px !important;
+        order: 2 !important;
+        /* 确保在flex容器中排在前面（左侧） */
+        margin-right: auto !important;
+        /* 强制向左推 */
+        margin-left: -5px !important;
+        font-size: 28px !important;
+        /* 增大尺寸方便手指点击 */
         color: #94a3b8 !important;
+        padding: 5px 15px 5px 5px !important;
+        /* 增加点击热区 */
+        display: block !important;
+        cursor: pointer !important;
         pointer-events: auto !important;
     }
 
     .close-btn:active {
         color: #ef4444 !important;
-        /* 按下时变红，增加反馈感 */
+        transform: scale(0.9);
+        /* 点击反馈 */
     }
 
+    /* 🌟 标题样式微调 */
+    .panel-header h3 {
+        order: 1 !important;
+        font-size: 14px !important;
+        margin: 0 !important;
+        pointer-events: none !important;
+        text-align: right !important;
+        /* 标题靠右显示 */
+    }
+
+    /* 🌟 在面板顶部增加一个装饰性手柄 */
+    .draggable-panel::before {
+        content: "";
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+        z-index: 2001;
+    }
+
+    /* 🌟 核心：移除强制撑高的 padding，让面板"刚刚好"适应内容 */
     .draggable-panel {
         position: fixed !important;
         left: 0 !important;
         top: auto !important;
         bottom: 0 !important;
         width: 100vw !important;
+        height: auto !important;
+        /* 默认高度根据内容自适应 */
         max-height: 85vh !important;
         border-radius: 24px 24px 0 0 !important;
         border-width: 2px 0 0 0 !important;
         z-index: 2000 !important;
         transform: translateY(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s !important;
+        /* 加入 height 的过渡动画，关闭/打开时更柔和 */
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s, height 0.3s !important;
         box-sizing: border-box;
-        /* 🌟 修复 2：增加底部内边距至 90px，为悬浮菜单留出绝对的安全空间 */
+        padding-bottom: 20px !important;
+        /* 恢复正常的底部边距 */
+        padding-top: 15px !important;
+    }
+
+    /* 🌟 核心：将安全区域垫在内容区底部，不强行拉长整个面板 */
+    .draggable-panel .panel-content {
+        max-height: calc(85vh - 60px) !important;
+        overflow-y: auto !important;
         padding-bottom: 90px !important;
+        /* 给右下角的悬浮菜单留出滚动空间 */
     }
 
     .draggable-panel:not(.hidden) {
@@ -184,5 +240,13 @@
     .action-btn {
         padding: 12px 8px !important;
         font-size: 13px !important;
+    }
+
+    /* 🌟 核心：将安全区域垫在内容区底部，不强行拉长整个面板 */
+    .draggable-panel .panel-content {
+        max-height: calc(85vh - 60px) !important;
+        overflow-y: auto !important;
+        padding-bottom: 90px !important;
+        /* 给右下角的悬浮菜单留出滚动空间 */
     }
 }

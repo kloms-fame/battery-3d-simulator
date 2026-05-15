@@ -70,7 +70,7 @@ leftPanel?.addEventListener('click', (e) => {
 });
 
 // =============================================
-// 🌟 更安全的窗口拖拽 (避免吞噬关闭按钮 + 移动端禁用)
+// 🌟 更安全的窗口拖拽 (包含移动端Bottom Sheet下拉物理引擎)
 // =============================================
 function makeDraggable(panelId: string, handleId: string) {
   const panel = document.getElementById(panelId);
@@ -79,15 +79,16 @@ function makeDraggable(panelId: string, handleId: string) {
   // 找不到元素直接退出，不报错
   if (!panel || !handle) return;
 
-  let isDragging = false, offsetX = 0, offsetY = 0;
+  // ---------------------------------------------
+  // 💻 PC端拖拽逻辑 (鼠标操作)
+  // ---------------------------------------------
+  let isDraggingPC = false, offsetX = 0, offsetY = 0;
 
   handle.addEventListener('mousedown', (e) => {
-    // 移动端（宽度≤768px）完全禁用拖拽功能
-    if (window.innerWidth <= 768) return;
-    // 点击关闭按钮时不触发拖拽
+    if (window.innerWidth <= 768) return; // 手机端交由Touch事件处理
     if ((e.target as HTMLElement).classList.contains('close-btn')) return;
 
-    isDragging = true;
+    isDraggingPC = true;
     const rect = panel.getBoundingClientRect();
     offsetX = e.clientX - rect.left;
     offsetY = e.clientY - rect.top;
@@ -97,7 +98,7 @@ function makeDraggable(panelId: string, handleId: string) {
   });
 
   document.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
+    if (!isDraggingPC) return;
     panel.style.left = `${e.clientX - offsetX}px`;
     panel.style.top = `${e.clientY - offsetY}px`;
     panel.style.bottom = 'auto';
@@ -105,20 +106,80 @@ function makeDraggable(panelId: string, handleId: string) {
   });
 
   document.addEventListener('mouseup', () => {
-    if (isDragging) {
-      isDragging = false;
+    if (isDraggingPC) {
+      isDraggingPC = false;
       panel.style.transition = 'opacity 0.3s';
     }
   });
+
+  // ---------------------------------------------
+  // 📱 移动端下拉拖拽逻辑 (可变长度 + 拉到底关闭)
+  // ---------------------------------------------
+  let isDraggingMobile = false;
+  let startY = 0;
+  let startHeight = 0;
+
+  handle.addEventListener('touchstart', (e) => {
+    if (window.innerWidth > 768) return;
+    if ((e.target as HTMLElement).classList.contains('close-btn')) return;
+
+    isDraggingMobile = true;
+    startY = e.touches[0].clientY;
+    startHeight = panel.getBoundingClientRect().height; // 🌟 记住按下时的初始高度
+
+    // 移除动画，实现 1:1 无延迟绝对跟手
+    panel.style.setProperty('transition', 'none', 'important');
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!isDraggingMobile) return;
+    // 🌟 拦截浏览器原生的下拉刷新或页面滚动
+    if (e.cancelable) e.preventDefault();
+
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - startY; // 大于 0 说明手指向下滑动（想变短）
+
+    let newHeight = startHeight - deltaY;
+
+    // 如果向上拉得很高，允许它长高，但设定一个极限界限与阻尼
+    const maxH = window.innerHeight * 0.85;
+    if (newHeight > maxH) {
+      newHeight = maxH + (newHeight - maxH) * 0.15; // 超过 85vh 后增加极强的拉扯阻尼感
+    }
+
+    // 🌟 直接改变面板的物理高度，实现随意调节长度
+    panel.style.setProperty('height', `${newHeight}px`, 'important');
+  }, { passive: false });
+
+  document.addEventListener('touchend', (e) => {
+    if (!isDraggingMobile) return;
+    isDraggingMobile = false;
+
+    // 恢复动画属性
+    panel.style.removeProperty('transition');
+
+    const endY = e.changedTouches[0].clientY;
+    const deltaY = endY - startY;
+    const finalHeight = startHeight - deltaY;
+
+    // 🌟 阈值判定：如果高度被压得很扁（小于 150px），或者快速下滑，直接触发关闭！
+    if (finalHeight < 150 || deltaY > 200) {
+      panel.style.removeProperty('height'); // 恢复自动高度
+      const closeBtn = panel.querySelector('.close-btn') as HTMLElement;
+      if (closeBtn) closeBtn.click();
+    } else if (finalHeight > window.innerHeight * 0.85) {
+      // 如果向上拉扯超标了，松手时回弹到 85vh
+      panel.style.setProperty('height', '85vh', 'important');
+    }
+    // 如果在正常范围内松手，面板会【保持】你刚才拖拽的那个高度！
+  });
 }
+
+// 为所有面板绑定拖拽功能
 makeDraggable('multimeter-ui', 'drag-header-multi');
 makeDraggable('network-ui', 'drag-header-net');
 makeDraggable('welder-ui', 'drag-header-welder');
-
-// 修复：只在元素存在时才绑定拖拽
-if (document.getElementById('nickel-ui')) {
-  makeDraggable('nickel-ui', 'drag-header-nickel');
-}
+makeDraggable('nickel-ui', 'drag-header-nickel');
 
 // =============================================
 // 3. FAB 菜单 & 工具切换
@@ -138,6 +199,11 @@ const switchTool = (tool: typeof currentTool) => {
   currentTool = tool;
   document.querySelectorAll('.fab-item').forEach(btn => btn.classList.remove('active'));
   document.getElementById(`tool-${tool}`)?.classList.add('active');
+
+  // 🌟 核心：每次切换工具时，强制清除所有面板残留的拖拽高度，让它恢复默认自动大小
+  ['multimeter-ui', 'network-ui', 'welder-ui', 'nickel-ui'].forEach(id => {
+    document.getElementById(id)?.style.removeProperty('height');
+  });
 
   multimeterUI.classList.toggle('hidden', tool !== 'multimeter');
   networkUI.classList.toggle('hidden', tool !== 'network');
