@@ -4,12 +4,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Battery Pack 3D Digital Twin</title>
-  <script type="module" crossorigin src="./assets/index-BWixhK4c.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BxpRd3cn.css">
+  <title>Battery Pack 3D Digital Twin</title> <!-- 移动端样式，必须放在最后 -->
+  <script type="module" crossorigin src="./assets/index-Bdr1mB8Q.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BlBylRmY.css">
 </head>
 
 <body>
+  <div id="mobile-header">
+    <button id="btn-mobile-menu">☰</button>
+    <span class="mobile-brand">⚡ 3D DIGITAL TWIN</span>
+  </div>
+  <div id="mobile-overlay"></div>
+
   <div id="canvas-container"></div>
 
   <div id="left-panel" class="panel">
@@ -23,7 +29,7 @@
         <input id="file-upload" type="file" accept=".json" />
       </div>
       <div class="control-group slider-group">
-        <label>💡 场景全局亮度: <span id="bright-val">100%</span></label>
+        <label for="slider-brightness">💡 场景全局亮度: <span id="bright-val">100%</span></label>
         <input type="range" id="slider-brightness" min="0" max="200" value="100" />
       </div>
       <div class="action-grid">
@@ -33,7 +39,24 @@
       <div class="control-group" style="margin-top: 10px;">
         <label class="layer-toggle"><input type="checkbox" id="toggle-wireframe" /> 🕸️ 透视线框模式 (X-Ray)</label>
       </div>
-      <div id="stats-display" class="stats-box">等待导入模型...</div>
+
+      <!-- 🌟 新增：全局选中信息面板 -->
+      <div id="global-info-panel"
+        style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid #334155; display: none;">
+        <div
+          style="color: #38bdf8; font-weight: bold; font-size: 13px; margin-bottom: 8px; display: flex; justify-content: space-between;">
+          <span>📍 当前选中图元</span>
+          <span id="g-info-type" style="color: #fbbf24; font-size: 11px;">电芯</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: #cbd5e1;">
+          <div>ID: <strong id="g-info-id" style="color: white;">--</strong></div>
+          <div>极性: <strong id="g-info-pol" style="color: white;">--</strong></div>
+          <div>电压: <strong id="g-info-v" style="color: white;">--</strong> V</div>
+          <div>内阻: <strong id="g-info-r" style="color: white;">--</strong> mΩ</div>
+        </div>
+      </div>
+
+      <div id="stats-display" class="stats-box" style="margin-top: 15px;">等待导入模型...</div>
     </div>
   </div>
 
@@ -56,6 +79,8 @@
       <button class="fab-item" id="tool-multimeter" title="虚拟万用表测量">📟</button>
       <button class="fab-item" id="tool-bms" title="3D BMS 飞线连焊">🧵</button>
       <button class="fab-item" id="tool-network" title="开启数字孪生同步">📡</button>
+      <button class="fab-item" id="tool-welder" title="CAM 智能点焊路径仿真">🔥</button>
+      <button class="fab-item" id="tool-nickel" title="最优长镍条合并排布">🧩</button>
     </div>
     <button id="fab-main" class="fab-main" title="工具箱">🛠️</button>
   </div>
@@ -92,7 +117,7 @@
         <h2 id="my-peer-id" style="margin:0; color:#38bdf8; font-family: monospace; letter-spacing: 2px;">初始化中...</h2>
       </div>
       <div class="control-group">
-        <label style="font-size: 12px; color: #94a3b8;">🔗 连接至 Easy_Battery_Tool (2D):</label>
+        <label for="target-peer-id" style="font-size: 12px; color: #94a3b8;">🔗 连接至 Easy_Battery_Tool (2D):</label>
         <div style="display: flex; gap: 10px; margin-top: 5px;">
           <input type="text" id="target-peer-id" placeholder="输入 2D 端的 ID"
             style="flex:1; background: #1e293b; border: 1px solid #475569; color: white; padding: 8px; border-radius: 4px;" />
@@ -103,6 +128,75 @@
       <div id="net-status" style="margin-top: 15px; font-size: 12px; color: #fbbf24; text-align: center;">等待连接...</div>
     </div>
   </div>
+
+  <!-- 🔥 智能点焊 CAM 仿真面板 -->
+  <div id="welder-ui" class="panel hidden draggable-panel"
+    style="bottom: 160px; right: 25px; border-color: #f97316; width: 340px;">
+    <div class="panel-header drag-handle" id="drag-header-welder">
+      <h3 style="color:#f97316; margin:0; pointer-events: none;">🔥 智能点焊 CAM 仿真</h3>
+      <span class="close-btn" id="btn-close-welder" title="关闭窗口">✖</span>
+    </div>
+    <div class="panel-content" style="text-align: center;">
+      <div id="weld-status" style="margin-bottom: 15px; font-size: 13px; color: #cbd5e1;">
+        请点击 3D 场景中的 <strong style="color:#f97316">一段灰色金属镍片</strong>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.5); height: 8px; border-radius: 4px; margin-bottom: 10px; overflow: hidden;">
+        <div id="weld-progress-bar" style="width: 0%; height: 100%; background: #f97316; transition: width 0.3s;"></div>
+      </div>
+      <div style="display:flex; justify-content: space-between; font-size:12px; color:#94a3b8; margin-bottom: 15px;">
+        <span id="weld-step-text">0 / 0</span>
+        <span id="weld-target-id">等待选择</span>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 15px; align-items: center;">
+        <button id="btn-weld-prev" class="action-btn"
+          style="border-radius: 50%; width:44px; height:44px; font-size: 16px;" disabled>⏮</button>
+        <button id="btn-weld-play" class="action-btn"
+          style="border-radius: 50%; width:56px; height:56px; border-color:#f97316; color:#f97316; font-size: 22px;"
+          disabled>▶</button>
+        <button id="btn-weld-next" class="action-btn"
+          style="border-radius: 50%; width:44px; height:44px; font-size: 16px;" disabled>⏭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🧩 智能镍片叠层排布系统 -->
+  <div id="nickel-ui" class="panel hidden draggable-panel"
+    style="bottom: 140px; right: 25px; border-color: #38bdf8; width: 340px;">
+    <div class="panel-header drag-handle" id="drag-header-nickel">
+      <h3 style="color:#38bdf8; margin:0; pointer-events: none;">🧩 智能镍片叠层排布系统</h3>
+      <span class="close-btn" id="btn-close-nickel" title="关闭窗口">✖</span>
+    </div>
+    <div class="panel-content" style="text-align: center;">
+      <div id="nickel-status" style="margin-bottom: 15px; font-size: 13px; color: #cbd5e1;">
+        请点击 3D 场景中的镍片网络进行 <strong style="color:#38bdf8">贪心合并计算</strong>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.5); height: 8px; border-radius: 4px; margin-bottom: 10px; overflow: hidden;">
+        <div id="nickel-progress-bar" style="width: 0%; height: 100%; background: #38bdf8; transition: width 0.3s;">
+        </div>
+      </div>
+      <div style="display:flex; justify-content: space-between; font-size:12px; color:#94a3b8; margin-bottom: 15px;">
+        <span id="nickel-step-text">0 / 0 条</span>
+        <span id="nickel-info-text">等待计算</span>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 15px; align-items: center; position: relative;">
+        <button id="btn-nickel-prev" class="action-btn"
+          style="border-radius: 50%; width:40px; height:40px; font-size: 14px;" disabled>⏮</button>
+        <button id="btn-nickel-play" class="action-btn"
+          style="border-radius: 50%; width:52px; height:52px; border-color:#38bdf8; color:#38bdf8; font-size: 20px;"
+          disabled>▶</button>
+        <button id="btn-nickel-next" class="action-btn"
+          style="border-radius: 50%; width:40px; height:40px; font-size: 14px;" disabled>⏭</button>
+        <button id="btn-nickel-reset" class="action-btn"
+          style="border-radius: 50%; width:36px; height:36px; font-size: 12px; position: absolute; right: 20px;"
+          disabled>↺</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>
