@@ -43,7 +43,34 @@ document.getElementById('toggle-wireframe')?.addEventListener('change', (e) => {
 });
 
 // =============================================
-// 🌟 更安全的窗口拖拽 (避免吞噬关闭按钮)
+// 📱 移动端专属菜单交互逻辑
+// =============================================
+const mobileMenuBtn = document.getElementById('btn-mobile-menu');
+const mobileOverlay = document.getElementById('mobile-overlay');
+const leftPanel = document.getElementById('left-panel');
+
+// 切换侧边抽屉
+function toggleMobileMenu() {
+  leftPanel?.classList.toggle('mobile-open');
+  mobileOverlay?.classList.toggle('active');
+}
+
+// 点击菜单按钮打开/关闭抽屉
+mobileMenuBtn?.addEventListener('click', toggleMobileMenu);
+
+// 点击遮罩层关闭抽屉
+mobileOverlay?.addEventListener('click', toggleMobileMenu);
+
+// 点击抽屉内的按钮/输入框时自动关闭抽屉（提升体验）
+leftPanel?.addEventListener('click', (e) => {
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('button') || target.closest('input')) {
+    setTimeout(toggleMobileMenu, 300);
+  }
+});
+
+// =============================================
+// 🌟 更安全的窗口拖拽 (避免吞噬关闭按钮 + 移动端禁用)
 // =============================================
 function makeDraggable(panelId: string, handleId: string) {
   const panel = document.getElementById(panelId);
@@ -55,6 +82,9 @@ function makeDraggable(panelId: string, handleId: string) {
   let isDragging = false, offsetX = 0, offsetY = 0;
 
   handle.addEventListener('mousedown', (e) => {
+    // 移动端（宽度≤768px）完全禁用拖拽功能
+    if (window.innerWidth <= 768) return;
+    // 点击关闭按钮时不触发拖拽
     if ((e.target as HTMLElement).classList.contains('close-btn')) return;
 
     isDragging = true;

@@ -6,9 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Battery Pack 3D Digital Twin</title>
   <link rel="stylesheet" href="/src/style.css" />
+  <link rel="stylesheet" href="/src/mobile.css" /> <!-- 移动端样式，必须放在最后 -->
 </head>
 
 <body>
+  <div id="mobile-header">
+    <button id="btn-mobile-menu">☰</button>
+    <span class="mobile-brand">⚡ 3D DIGITAL TWIN</span>
+  </div>
+  <div id="mobile-overlay"></div>
+
   <div id="canvas-container"></div>
 
   <div id="left-panel" class="panel">
