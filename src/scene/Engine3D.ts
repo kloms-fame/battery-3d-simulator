@@ -116,6 +116,21 @@ export class Engine3D {
         this.dirLight.intensity = 1.2 * factor;
     }
 
+    // 🌟 隐藏指定ID的短连接镍片（不影响其他镍片）
+    public hideSpecificBusbars(busbarIds: string[]): void {
+        this.groups.busbars.children.forEach((mesh) => {
+            if (mesh.userData && busbarIds.includes(mesh.userData.busbarId)) {
+                mesh.visible = false;
+            }
+        });
+    }
+
+    // 🌟 恢复所有镍片的显示
+    public showAllBusbars(): void {
+        this.groups.busbars.children.forEach((mesh) => {
+            mesh.visible = true;
+        });
+    }
     // ==========================
     // 核心：射线检测 + 法线交互
     // ==========================

@@ -126,7 +126,7 @@ const switchTool = (tool: typeof currentTool) => {
   // 新增：退出镍片模式时重置
   if (tool !== 'nickel') {
     engine.nickelPlanner.reset();
-    engine.setLayerVisible('busbars', true);
+    engine.showAllBusbars(); // 核心修复：使用专用方法恢复所有镍片显示
   }
 
   fabContainer.classList.remove('open');
@@ -183,14 +183,50 @@ function calculateTopologyVoltage(idA: string, idB: string, doc: any): string {
 engine.onCellClick((cellData, intersectPoint, normal) => {
   if (!currentDoc) return;
 
-  // 🌟 新增：镍片排布模式
+  // 🌟 全局处理：指针模式下点击任意图元，更新左侧全局信息面板
+  if (currentTool === 'pointer') {
+    const globalInfo = document.getElementById('global-info-panel');
+    if (globalInfo) {
+      globalInfo.style.display = 'block';
+
+      // 点击高亮动画
+      globalInfo.style.boxShadow = '0 0 15px rgba(56, 189, 248, 0.5)';
+      setTimeout(() => {
+        if (globalInfo) globalInfo.style.boxShadow = 'none';
+      }, 300);
+
+      // 更新图元信息
+      const infoId = document.getElementById('g-info-id');
+      const infoType = document.getElementById('g-info-type');
+      const infoPol = document.getElementById('g-info-pol');
+      const infoV = document.getElementById('g-info-v');
+      const infoR = document.getElementById('g-info-r');
+
+      infoId && (infoId.innerText = cellData.id || cellData.busbarId || '--');
+      infoType && (infoType.innerText = cellData.busbarId ? '⚡ 镍片/走线' : '🔋 物理电芯');
+
+      let polText = '--';
+      if (cellData.polarity === 'positive') polText = '正极 (+)';
+      else if (cellData.polarity === 'negative') polText = '负极 (-)';
+      infoPol && (infoPol.innerText = polText);
+
+      infoV && (infoV.innerText = cellData.voltage || '--');
+      infoR && (infoR.innerText = cellData.resistance || '--');
+    }
+  }
+
+  // 🌟 镍片排布模式
   if (currentTool === 'nickel') {
     if (cellData.busbarId) {
-      engine.setLayerVisible('busbars', false);
-      engine.nickelPlanner.calculateLayout(cellData.busbarId, currentDoc, engine.get3DPos.bind(engine));
+      // 核心修复：只隐藏被合并的原始短线，不影响其他镍片
+      const mergedIds = engine.nickelPlanner.calculateLayout(cellData.busbarId, currentDoc, engine.get3DPos.bind(engine));
+      engine.hideSpecificBusbars(mergedIds);
 
+      // 解锁所有控制按钮
+      ['btn-nickel-play', 'btn-nickel-prev', 'btn-nickel-next', 'btn-nickel-reset'].forEach(id => {
+        document.getElementById(id)?.removeAttribute('disabled');
+      });
       const nickelPlayBtn = document.getElementById('btn-nickel-play');
-      nickelPlayBtn?.removeAttribute('disabled');
       nickelPlayBtn && (nickelPlayBtn.innerHTML = '▶');
     } else {
       engine.nickelPlanner.onStatus?.('⚠️ 请点击灰色的金属连线作为算法起点');
@@ -450,6 +486,7 @@ engine.nickelPlanner.onStatus = (status) => {
   document.getElementById('nickel-status') && (document.getElementById('nickel-status')!.innerHTML = status);
 };
 
+// 播放/暂停按钮
 document.getElementById('btn-nickel-play')?.addEventListener('click', (e) => {
   const btn = e.target as HTMLButtonElement;
   if (btn.innerHTML.includes('▶')) {
@@ -461,7 +498,24 @@ document.getElementById('btn-nickel-play')?.addEventListener('click', (e) => {
   }
 });
 
+// 上一步按钮
+document.getElementById('btn-nickel-prev')?.addEventListener('click', () => {
+  engine.nickelPlanner.prevStep();
+  const nickelPlayBtn = document.getElementById('btn-nickel-play');
+  nickelPlayBtn && (nickelPlayBtn.innerHTML = '▶');
+});
+
+// 下一步按钮
+document.getElementById('btn-nickel-next')?.addEventListener('click', () => {
+  engine.nickelPlanner.nextStep();
+  const nickelPlayBtn = document.getElementById('btn-nickel-play');
+  nickelPlayBtn && (nickelPlayBtn.innerHTML = '▶');
+});
+
+// 重置按钮（核心修复：重置时恢复所有镍片显示）
 document.getElementById('btn-nickel-reset')?.addEventListener('click', () => {
   engine.nickelPlanner.reset();
-  document.getElementById('btn-nickel-play') && (document.getElementById('btn-nickel-play')!.innerHTML = '▶');
+  engine.showAllBusbars();
+  const nickelPlayBtn = document.getElementById('btn-nickel-play');
+  nickelPlayBtn && (nickelPlayBtn.innerHTML = '▶');
 });

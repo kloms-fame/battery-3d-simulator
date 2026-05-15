@@ -32,9 +32,9 @@ export class NickelLayoutPlanner {
     }
 
     // 🌟 核心算法：贪心共线合并与分层排列
-    public calculateLayout(clickedBusbarId: string, doc: any, get3DPos: (cx: number, cy: number) => { x: number, z: number }) {
+    public calculateLayout(clickedBusbarId: string, doc: any, get3DPos: (cx: number, cy: number) => { x: number, z: number }): string[] {
         const startBar = doc.busbars.find((b: any) => b.id === clickedBusbarId);
-        if (!startBar) return;
+        if (!startBar) return []; // 失败返回空数组
 
         const targetSide = startBar.side || 'front';
         const height = 65;
@@ -58,6 +58,9 @@ export class NickelLayoutPlanner {
                     .forEach((x: any) => { if (!visited.has(x.id)) queue.push(x.id); });
             }
         }
+
+        // 🌟 提取所有参与合并的原始短线ID
+        const originalBusbarIds = localBusbars.map(b => b.id);
 
         // 2. 贪心共线合并 (合并相邻且斜率相同的短线，变成长条镍片)
         let mergedStrips: any[] = [];
@@ -147,6 +150,8 @@ export class NickelLayoutPlanner {
 
         if (this.onStatus) this.onStatus(`✅ 路径拓扑优化完毕，共整合为 ${this.targetStrips.length} 条长镍片。`);
         this.updateUI();
+
+        return originalBusbarIds; // 🌟 返回所有被合并的原始镍片ID
     }
 
     public play() {
@@ -156,7 +161,35 @@ export class NickelLayoutPlanner {
     }
 
     public pause() { this.isPlaying = false; }
-    public reset() { this.pause(); this.layoutGroup.clear(); this.currentStep = 0; this.updateUI(); }
+
+    // 🌟 下一步：单步贴装一条长镍片
+    public nextStep() {
+        this.pause();
+        if (!this.isAnimating && this.currentStep < this.targetStrips.length) {
+            this.animateNextStrip();
+        }
+    }
+
+    // 🌟 上一步：移除最后一条贴装好的长镍片
+    public prevStep() {
+        this.pause();
+        if (!this.isAnimating && this.currentStep > 0) {
+            this.currentStep--;
+            // 移除3D场景中最后添加的镍片
+            const lastStripMesh = this.layoutGroup.children[this.currentStep];
+            if (lastStripMesh) {
+                this.layoutGroup.remove(lastStripMesh);
+            }
+            this.updateUI();
+        }
+    }
+
+    public reset() {
+        this.pause();
+        this.layoutGroup.clear();
+        this.currentStep = 0;
+        this.updateUI();
+    }
 
     private updateUI() {
         if (this.onProgress) {
