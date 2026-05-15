@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battery Pack 3D Digital Twin</title>
+  <script type="module" crossorigin src="./assets/index-BbBMoL08.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DWK9xzu_.css">
+</head>
+
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="left-panel" class="panel">
+    <div class="panel-header" id="toggle-left-panel">
+      <h1 class="brand">⚡ PACK SIMULATOR</h1>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="panel-content" id="left-panel-content">
+      <div class="control-group">
+        <label for="file-upload" class="custom-file-upload">📂 导入 CAD JSON 工程</label>
+        <input id="file-upload" type="file" accept=".json" />
+      </div>
+      <div class="control-group slider-group">
+        <label>💡 场景全局亮度: <span id="bright-val">100%</span></label>
+        <input type="range" id="slider-brightness" min="0" max="200" value="100" />
+      </div>
+      <div class="action-grid">
+        <button id="btn-reset-cam" class="action-btn">🎥 重置视角</button>
+        <button id="btn-auto-rotate" class="action-btn">🔄 自动旋转</button>
+      </div>
+      <div class="control-group" style="margin-top: 10px;">
+        <label class="layer-toggle"><input type="checkbox" id="toggle-wireframe" /> 🕸️ 透视线框模式 (X-Ray)</label>
+      </div>
+      <div id="stats-display" class="stats-box">等待导入模型...</div>
+    </div>
+  </div>
+
+  <div id="layer-panel" class="panel">
+    <div class="panel-header" id="toggle-layer-panel">
+      <h3>🗂️ 3D 图层控制</h3>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="panel-content" id="layer-panel-content">
+      <label class="layer-toggle"><input type="checkbox" id="layer-cells" checked /> 🔋 电芯主体 (Cells)</label>
+      <label class="layer-toggle"><input type="checkbox" id="layer-busbars" checked /> ⚡ 金属镍片 (Busbars)</label>
+      <label class="layer-toggle"><input type="checkbox" id="layer-bms" checked /> 🧵 BMS 飞线 (Wiring)</label>
+      <label class="layer-toggle"><input type="checkbox" id="layer-labels" checked /> 🏷️ 空间编号 (Labels)</label>
+    </div>
+  </div>
+
+  <div id="fab-container" class="fab-container">
+    <div class="fab-menu" id="fab-menu">
+      <button class="fab-item active" id="tool-pointer" title="默认观察指针">👆</button>
+      <button class="fab-item" id="tool-multimeter" title="虚拟万用表测量">📟</button>
+      <button class="fab-item" id="tool-bms" title="3D BMS 飞线连焊">🧵</button>
+    </div>
+    <button id="fab-main" class="fab-main" title="工具箱">🛠️</button>
+  </div>
+
+  <div id="multimeter-ui" class="panel hidden draggable-panel">
+    <div class="panel-header drag-handle" id="drag-header">
+      <h3 style="color:#fbbf24; margin:0; pointer-events: none;">📟 虚拟万用表终端</h3>
+      <span style="color:#94a3b8; font-size:12px; pointer-events: none;">✥ 拖拽</span>
+    </div>
+    <div class="panel-content">
+      <div class="lcd-screen">
+        <span class="lcd-mode">DC Voltage (拓扑测算)</span>
+        <span class="lcd-value" id="lcd-v">0.00</span> <span class="lcd-unit">V</span>
+      </div>
+      <div class="probe-status" id="probe-status">请激活万用表并点击极耳</div>
+      <div id="cell-info-box" class="cell-info hidden">
+        <div class="info-row"><span>当前选中 ID:</span> <strong id="info-id" style="color:#38bdf8;">--</strong></div>
+        <div class="info-row"><span>物理极性:</span> <strong id="info-pol">--</strong></div>
+        <div class="info-row"><span>标称电压:</span> <strong id="info-v">--</strong></div>
+        <div class="info-row"><span>内阻估算:</span> <strong id="info-r">--</strong></div>
+      </div>
+    </div>
+    <button id="btn-reset-probes" class="reset-btn">🔄 收回探针</button>
+  </div>
+
+</body>
+
+</html>
