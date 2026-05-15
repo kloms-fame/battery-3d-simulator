@@ -398,11 +398,34 @@ document.getElementById('btn-reset-probes')?.addEventListener('click', () => {
 });
 
 // =============================================
-// 6. WebRTC 数字孪生同步引擎 (高性能局部刷新)
+// 🌟 新增：统计信息UI更新函数
+// =============================================
+function updateStatsUI(doc: any, isDragging: boolean) {
+  const stats = document.getElementById('stats-display')!;
+  // 强制使用可选链 ?. 防止极端情况下的 undefined
+  const cellCount = doc.cells?.length || 0;
+  const busbarCount = doc.busbars?.length || 0;
+
+  stats.innerHTML = `<span style="color:#38bdf8">📡 实时同步中</span><br>电芯: ${cellCount} | 镍片: ${busbarCount}`;
+  if (isDragging) {
+    stats.style.borderLeft = "4px solid #f59e0b";
+    stats.style.paddingLeft = "8px";
+  } else {
+    stats.style.borderLeft = "4px solid #10b981";
+    stats.style.paddingLeft = "8px";
+    setTimeout(() => {
+      stats.style.borderLeft = "none";
+      stats.style.paddingLeft = "0";
+    }, 500);
+  }
+}
+
+// =============================================
+// 🌟 重构：WebRTC智能数据清洗与分流引擎
 // =============================================
 let peer: Peer;
 let connections: any[] = [];
-let firstLoadDone = false;
+
 
 function initNetwork() {
   const id = `3D-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -424,13 +447,13 @@ function initNetwork() {
 
 function handleConnection(conn: any) {
   connections.push(conn);
-
   conn.on('open', () => {
-    document.getElementById('net-status') && (document.getElementById('net-status')!.innerText = `✅ 已成功直连 2D 引擎: ${conn.peer}`);
-    document.getElementById('net-status') && (document.getElementById('net-status')!.style.color = '#10b981');
+    document.getElementById('net-status')!.innerText = `✅ 已直连 2D 引擎: ${conn.peer}`;
+    document.getElementById('net-status')!.style.color = '#10b981';
   });
 
   conn.on('data', (data: any) => {
+    // 过滤无关的鼠标光标移动事件
     if (data.cursor || data.type === 'cursor') return;
 
     let incomingDoc = data.doc ? data.doc : data;
@@ -438,29 +461,50 @@ function handleConnection(conn: any) {
       incomingDoc = data.data.doc;
     }
 
-    if (incomingDoc && incomingDoc.cells && Array.isArray(incomingDoc.cells)) {
-      if (!incomingDoc.busbars) incomingDoc.busbars = [];
-      if (!incomingDoc.bmsWires) incomingDoc.bmsWires = [];
+    // 🚨 终极安全校验：防止 undefined 引发 TypeError 崩溃
+    if (!incomingDoc || !Array.isArray(incomingDoc.cells)) return;
 
-      currentDoc = incomingDoc;
+    // 强制初始化缺失的数组
+    const inCells = incomingDoc.cells;
+    const inBusbars = Array.isArray(incomingDoc.busbars) ? incomingDoc.busbars : [];
+    const inBms = Array.isArray(incomingDoc.bmsWires) ? incomingDoc.bmsWires : [];
 
-      // 🔥 核心：第一次全量加载，之后只刷新坐标 → 巨丝滑
-      if (!firstLoadDone) {
-        engine.loadBatteryPack(currentDoc);
-        firstLoadDone = true;
-      } else {
-        engine.refreshPositions(currentDoc);
-      }
+    if (!currentDoc) {
+      // 第一次连接，执行全量加载
+      currentDoc = { cells: inCells, busbars: inBusbars, bmsWires: inBms };
+      engine.loadBatteryPack(currentDoc);
+      updateStatsUI(currentDoc, false);
+      return;
+    }
 
-      const stats = document.getElementById('stats-display');
-      stats && (stats.innerHTML = `<span style="color:#38bdf8">📡 实时接收协同更新</span><br>电芯: ${currentDoc.cells.length} | 镍片: ${currentDoc.busbars.length}`);
-      stats && (stats.style.borderLeft = "4px solid #38bdf8");
-      stats && (stats.style.paddingLeft = "8px");
+    // 🚨 核心逻辑：精准判定是否为"局部拖拽包"
+    // 判定条件：
+    // 1. 数据明确标记为 drag
+    // 2. 数据完全缺失 busbars 字段
+    // 3. 只发送了不到一半的电芯且没有镍片数据
+    let isPartialDrag = false;
+    if (data.type === 'drag' || data.action === 'drag' || data.isDrag || incomingDoc.busbars === undefined) {
+      isPartialDrag = true;
+    } else if (inCells.length > 0 && inCells.length < currentDoc.cells.length * 0.5 && inBusbars.length === 0) {
+      isPartialDrag = true;
+    }
 
-      setTimeout(() => {
-        stats && (stats.style.borderLeft = "none");
-        stats && (stats.style.paddingLeft = "0");
-      }, 500);
+    if (isPartialDrag) {
+      // 🚀 模式 A：拖拽高性能局部刷新
+      inCells.forEach((ic: any) => {
+        const target = currentDoc.cells.find((c: any) => c.id === ic.id);
+        if (target) {
+          target.cx = ic.cx;
+          target.cy = ic.cy;
+        }
+      });
+      engine.refreshPositions(currentDoc);
+      updateStatsUI(currentDoc, true);
+    } else {
+      // 🚀 模式 B：全量状态智能Diff（增加、删除、连线）
+      currentDoc = { cells: inCells, busbars: inBusbars, bmsWires: inBms };
+      engine.syncBatteryPack(currentDoc); // 呼叫Diff大脑
+      updateStatsUI(currentDoc, false);
     }
   });
 }
@@ -488,8 +532,7 @@ document.getElementById('file-upload')?.addEventListener('change', (e) => {
       if (data?.doc) {
         currentDoc = data.doc;
         engine.loadBatteryPack(currentDoc);
-        firstLoadDone = true;
-        document.getElementById('stats-display') && (document.getElementById('stats-display')!.innerHTML = '✅ 模型已加载');
+        updateStatsUI(currentDoc, false);
       }
     } catch {
       alert('JSON 解析失败');
@@ -499,25 +542,13 @@ document.getElementById('file-upload')?.addEventListener('change', (e) => {
 });
 
 // =============================================
-// 🌟 面板关闭按钮逻辑联动 FAB 菜单
+// 🌟 重构：统一面板关闭按钮逻辑
 // =============================================
-document.getElementById('btn-close-multi')?.addEventListener('click', () => {
-  document.getElementById('multimeter-ui')?.classList.add('hidden');
-  document.getElementById('tool-multimeter')?.classList.remove('active');
-  if (currentTool === 'multimeter') {
-    currentTool = 'pointer';
-    document.getElementById('tool-pointer')?.classList.add('active');
-    probedCells = [];
-    engine.clearProbes();
-  }
+['multi', 'net', 'welder', 'nickel'].forEach(suffix => {
+  document.getElementById(`btn-close-${suffix}`)?.addEventListener('click', () => {
+    switchTool('pointer'); // 点击关闭时，强制退回默认鼠标指针状态
+  });
 });
-
-document.getElementById('btn-close-net')?.addEventListener('click', () => {
-  document.getElementById('network-ui')?.classList.add('hidden');
-  document.getElementById('tool-network')?.classList.remove('active');
-});
-
-document.getElementById('btn-close-nickel')?.addEventListener('click', () => switchTool('pointer'));
 
 // 🔥 点焊 CAM 仿真控制器
 const btnPlay = document.getElementById('btn-weld-play') as HTMLButtonElement | null;
