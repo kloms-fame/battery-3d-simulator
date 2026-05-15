@@ -119,14 +119,25 @@
     }
 
     /* 5. 核心：拖拽面板变身“现代化底部模态框 (Bottom Sheet)” */
+    /* 🌟 修复 1：释放头部点击权限，找回关闭按钮 */
     .drag-handle {
-        pointer-events: none !important;
-        /* 手机端禁止PC拖拽逻辑 */
+        pointer-events: auto !important;
     }
 
-    .drag-handle span:last-child {
-        display: none !important;
-        /* 隐藏“拖拽”字样 */
+    /* 🌟 专门为手机端优化的“✖”关闭按钮 */
+    .close-btn {
+        display: block !important;
+        font-size: 24px !important;
+        /* 放大触控面积，防误触 */
+        padding: 5px 15px !important;
+        margin-right: -10px !important;
+        color: #94a3b8 !important;
+        pointer-events: auto !important;
+    }
+
+    .close-btn:active {
+        color: #ef4444 !important;
+        /* 按下时变红，增加反馈感 */
     }
 
     .draggable-panel {
@@ -142,8 +153,8 @@
         transform: translateY(100%);
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s !important;
         box-sizing: border-box;
-        padding-bottom: 20px !important;
-        /* 适配iPhone底部安全区 */
+        /* 🌟 修复 2：增加底部内边距至 90px，为悬浮菜单留出绝对的安全空间 */
+        padding-bottom: 90px !important;
     }
 
     .draggable-panel:not(.hidden) {
@@ -162,9 +173,12 @@
         font-size: 32px !important;
     }
 
+    /* 🌟 修复 3：确保右下角悬浮圆盘菜单永远处于最顶层 */
     .fab-container {
-        bottom: 20px !important;
+        bottom: 25px !important;
         right: 15px !important;
+        z-index: 9999 !important;
+        /* 绝对碾压底部面板的 2000 层级 */
     }
 
     .action-btn {
