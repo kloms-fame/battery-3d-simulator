@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { WeldingSimulator } from './WeldingSimulator';
+import { NickelLayoutPlanner } from './NickelLayoutPlanner';
 
 export class Engine3D {
     private scene: THREE.Scene;
@@ -15,6 +16,7 @@ export class Engine3D {
 
     // 焊接仿真器实例
     public welder: WeldingSimulator;
+    public nickelPlanner: NickelLayoutPlanner;
 
     // 图层管理
     public groups = {
@@ -77,6 +79,7 @@ export class Engine3D {
 
         // 实例化焊接仿真器
         this.welder = new WeldingSimulator(this.scene);
+        this.nickelPlanner = new NickelLayoutPlanner(this.scene);
 
         this.animate();
     }

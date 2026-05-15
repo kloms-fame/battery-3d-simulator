@@ -5,7 +5,7 @@ const engine = new Engine3D('canvas-container');
 
 let currentDoc: any = null;
 let probedCells: { id: string, voltage: number }[] = [];
-let currentTool: 'pointer' | 'multimeter' | 'bms' | 'network' | 'welder' = 'pointer';
+let currentTool: 'pointer' | 'multimeter' | 'bms' | 'network' | 'welder' | 'nickel' = 'pointer';
 
 // =============================================
 // 1. UI 面板与图层控制
@@ -19,7 +19,7 @@ document.getElementById('toggle-layer-panel')?.addEventListener('click', () => {
 
 document.getElementById('slider-brightness')?.addEventListener('input', (e) => {
   const val = (e.target as HTMLInputElement).value;
-  document.getElementById('bright-val')!.innerText = `${val}%`;
+  document.getElementById('bright-val') && (document.getElementById('bright-val')!.innerText = `${val}%`);
   engine.setBrightness(parseInt(val));
 });
 
@@ -43,11 +43,15 @@ document.getElementById('toggle-wireframe')?.addEventListener('change', (e) => {
 });
 
 // =============================================
-// 🌟 1. 更安全的窗口拖拽 (避免吞噬关闭按钮)
+// 🌟 更安全的窗口拖拽 (避免吞噬关闭按钮)
 // =============================================
 function makeDraggable(panelId: string, handleId: string) {
-  const panel = document.getElementById(panelId)!;
-  const handle = document.getElementById(handleId)!;
+  const panel = document.getElementById(panelId);
+  const handle = document.getElementById(handleId);
+
+  // 找不到元素直接退出，不报错
+  if (!panel || !handle) return;
+
   let isDragging = false, offsetX = 0, offsetY = 0;
 
   handle.addEventListener('mousedown', (e) => {
@@ -81,6 +85,11 @@ makeDraggable('multimeter-ui', 'drag-header-multi');
 makeDraggable('network-ui', 'drag-header-net');
 makeDraggable('welder-ui', 'drag-header-welder');
 
+// 修复：只在元素存在时才绑定拖拽
+if (document.getElementById('nickel-ui')) {
+  makeDraggable('nickel-ui', 'drag-header-nickel');
+}
+
 // =============================================
 // 3. FAB 菜单 & 工具切换
 // =============================================
@@ -92,7 +101,10 @@ document.getElementById('fab-main')?.addEventListener('click', () => {
   fabContainer.classList.toggle('open');
 });
 
-const switchTool = (tool: 'pointer' | 'multimeter' | 'bms' | 'network' | 'welder') => {
+// 先在顶部定义 nickelUI（和 multimeterUI 放一起）
+const nickelUI = document.getElementById('nickel-ui');
+
+const switchTool = (tool: typeof currentTool) => {
   currentTool = tool;
   document.querySelectorAll('.fab-item').forEach(btn => btn.classList.remove('active'));
   document.getElementById(`tool-${tool}`)?.classList.add('active');
@@ -100,6 +112,7 @@ const switchTool = (tool: 'pointer' | 'multimeter' | 'bms' | 'network' | 'welder
   multimeterUI.classList.toggle('hidden', tool !== 'multimeter');
   networkUI.classList.toggle('hidden', tool !== 'network');
   document.getElementById('welder-ui')?.classList.toggle('hidden', tool !== 'welder');
+  nickelUI?.classList.toggle('hidden', tool !== 'nickel');
 
   if (tool !== 'multimeter') {
     probedCells = [];
@@ -110,6 +123,12 @@ const switchTool = (tool: 'pointer' | 'multimeter' | 'bms' | 'network' | 'welder
     engine.welder.reset();
   }
 
+  // 新增：退出镍片模式时重置
+  if (tool !== 'nickel') {
+    engine.nickelPlanner.reset();
+    engine.setLayerVisible('busbars', true);
+  }
+
   fabContainer.classList.remove('open');
 };
 
@@ -118,7 +137,7 @@ document.getElementById('tool-multimeter')?.addEventListener('click', () => swit
 document.getElementById('tool-bms')?.addEventListener('click', () => switchTool('bms'));
 document.getElementById('tool-network')?.addEventListener('click', () => switchTool('network'));
 document.getElementById('tool-welder')?.addEventListener('click', () => switchTool('welder'));
-
+document.getElementById('tool-nickel')?.addEventListener('click', () => switchTool('nickel')); // 新增
 document.getElementById('btn-close-welder')?.addEventListener('click', () => switchTool('pointer'));
 
 // =============================================
@@ -164,30 +183,45 @@ function calculateTopologyVoltage(idA: string, idB: string, doc: any): string {
 engine.onCellClick((cellData, intersectPoint, normal) => {
   if (!currentDoc) return;
 
+  // 🌟 新增：镍片排布模式
+  if (currentTool === 'nickel') {
+    if (cellData.busbarId) {
+      engine.setLayerVisible('busbars', false);
+      engine.nickelPlanner.calculateLayout(cellData.busbarId, currentDoc, engine.get3DPos.bind(engine));
+
+      const nickelPlayBtn = document.getElementById('btn-nickel-play');
+      nickelPlayBtn?.removeAttribute('disabled');
+      nickelPlayBtn && (nickelPlayBtn.innerHTML = '▶');
+    } else {
+      engine.nickelPlanner.onStatus?.('⚠️ 请点击灰色的金属连线作为算法起点');
+    }
+    return;
+  }
+
   // 🔥 点焊模式：点击镍片生成路径
   if (currentTool === 'welder') {
     if (cellData.busbarId) {
       (engine.welder as any).lastBusbarId = cellData.busbarId;
       engine.welder.calculateOptimalPath(cellData.busbarId, currentDoc, engine.get3DPos.bind(engine));
 
-      btnPlay.removeAttribute('disabled');
-      btnPrev.removeAttribute('disabled');
-      btnNext.removeAttribute('disabled');
-      btnPlay.innerHTML = '▶';
+      btnPlay?.removeAttribute('disabled');
+      btnPrev?.removeAttribute('disabled');
+      btnNext?.removeAttribute('disabled');
+      btnPlay && (btnPlay.innerHTML = '▶');
     } else {
-      engine.welder.onStatusChange!('⚠️ 请点击灰色的金属镍片带，不要点电芯外壳');
+      engine.welder.onStatusChange?.('⚠️ 请点击灰色的金属镍片带，不要点电芯外壳');
     }
     return;
   }
 
   // 原万用表逻辑
   if (currentTool === 'multimeter') {
-    const infoBox = document.getElementById('cell-info-box')!;
-    infoBox.classList.remove('hidden');
-    document.getElementById('info-id')!.innerText = cellData.id;
-    document.getElementById('info-pol')!.innerText = cellData.polarity === 'positive' ? '正极 (+)' : '负极 (-)';
-    document.getElementById('info-v')!.innerText = `${cellData.voltage} V`;
-    document.getElementById('info-r')!.innerText = `${cellData.resistance} mΩ`;
+    const infoBox = document.getElementById('cell-info-box');
+    infoBox?.classList.remove('hidden');
+    document.getElementById('info-id') && (document.getElementById('info-id')!.innerText = cellData.id);
+    document.getElementById('info-pol') && (document.getElementById('info-pol')!.innerText = cellData.polarity === 'positive' ? '正极 (+)' : '负极 (-)');
+    document.getElementById('info-v') && (document.getElementById('info-v')!.innerText = `${cellData.voltage} V`);
+    document.getElementById('info-r') && (document.getElementById('info-r')!.innerText = `${cellData.resistance} mΩ`);
 
     if (probedCells.length >= 2) {
       probedCells = [];
@@ -198,17 +232,17 @@ engine.onCellClick((cellData, intersectPoint, normal) => {
     const color = probedCells.length === 1 ? '#ef4444' : '#000000';
     engine.addProbeMarker(intersectPoint, color, normal);
 
-    const status = document.getElementById('probe-status')!;
-    const lcd = document.getElementById('lcd-v')!;
+    const status = document.getElementById('probe-status');
+    const lcd = document.getElementById('lcd-v');
 
     if (probedCells.length === 1) {
-      status.innerText = `红表笔 → ${cellData.id}`;
-      status.style.color = '#ef4444';
-      lcd.innerText = '0.00';
+      status && (status.innerText = `红表笔 → ${cellData.id}`);
+      status && (status.style.color = '#ef4444');
+      lcd && (lcd.innerText = '0.00');
     } else {
-      status.innerText = `测量：${probedCells[0].id} ↔ ${probedCells[1].id}`;
-      status.style.color = '#10b981';
-      lcd.innerText = calculateTopologyVoltage(probedCells[0].id, probedCells[1].id, currentDoc);
+      status && (status.innerText = `测量：${probedCells[0].id} ↔ ${probedCells[1].id}`);
+      status && (status.style.color = '#10b981');
+      lcd && (lcd.innerText = calculateTopologyVoltage(probedCells[0].id, probedCells[1].id, currentDoc));
     }
   }
 
@@ -227,8 +261,8 @@ engine.onCellClick((cellData, intersectPoint, normal) => {
 document.getElementById('btn-reset-probes')?.addEventListener('click', () => {
   probedCells = [];
   engine.clearProbes();
-  document.getElementById('lcd-v')!.innerText = '0.00';
-  document.getElementById('probe-status')!.innerText = '请点击金属极耳';
+  document.getElementById('lcd-v') && (document.getElementById('lcd-v')!.innerText = '0.00');
+  document.getElementById('probe-status') && (document.getElementById('probe-status')!.innerText = '请点击金属极耳');
 });
 
 // =============================================
@@ -250,7 +284,7 @@ function initNetwork() {
   });
 
   peer.on('open', (id) => {
-    document.getElementById('my-peer-id')!.innerText = id;
+    document.getElementById('my-peer-id') && (document.getElementById('my-peer-id')!.innerText = id);
   });
 
   peer.on('connection', handleConnection);
@@ -260,8 +294,8 @@ function handleConnection(conn: any) {
   connections.push(conn);
 
   conn.on('open', () => {
-    document.getElementById('net-status')!.innerText = `✅ 已成功直连 2D 引擎: ${conn.peer}`;
-    document.getElementById('net-status')!.style.color = '#10b981';
+    document.getElementById('net-status') && (document.getElementById('net-status')!.innerText = `✅ 已成功直连 2D 引擎: ${conn.peer}`);
+    document.getElementById('net-status') && (document.getElementById('net-status')!.style.color = '#10b981');
   });
 
   conn.on('data', (data: any) => {
@@ -286,14 +320,14 @@ function handleConnection(conn: any) {
         engine.refreshPositions(currentDoc);
       }
 
-      const stats = document.getElementById('stats-display')!;
-      stats.innerHTML = `<span style="color:#38bdf8">📡 实时接收协同更新</span><br>电芯: ${currentDoc.cells.length} | 镍片: ${currentDoc.busbars.length}`;
-      stats.style.borderLeft = "4px solid #38bdf8";
-      stats.style.paddingLeft = "8px";
+      const stats = document.getElementById('stats-display');
+      stats && (stats.innerHTML = `<span style="color:#38bdf8">📡 实时接收协同更新</span><br>电芯: ${currentDoc.cells.length} | 镍片: ${currentDoc.busbars.length}`);
+      stats && (stats.style.borderLeft = "4px solid #38bdf8");
+      stats && (stats.style.paddingLeft = "8px");
 
       setTimeout(() => {
-        stats.style.borderLeft = "none";
-        stats.style.paddingLeft = "0";
+        stats && (stats.style.borderLeft = "none");
+        stats && (stats.style.paddingLeft = "0");
       }, 500);
     }
   });
@@ -302,7 +336,7 @@ function handleConnection(conn: any) {
 document.getElementById('btn-connect-peer')?.addEventListener('click', () => {
   const target = (document.getElementById('target-peer-id') as HTMLInputElement).value.trim().toUpperCase();
   if (target) {
-    document.getElementById('net-status')!.innerText = `🚀 连接中：${target}`;
+    document.getElementById('net-status') && (document.getElementById('net-status')!.innerText = `🚀 连接中：${target}`);
     handleConnection(peer.connect(target));
   }
 });
@@ -323,7 +357,7 @@ document.getElementById('file-upload')?.addEventListener('change', (e) => {
         currentDoc = data.doc;
         engine.loadBatteryPack(currentDoc);
         firstLoadDone = true;
-        document.getElementById('stats-display')!.innerHTML = '✅ 模型已加载';
+        document.getElementById('stats-display') && (document.getElementById('stats-display')!.innerHTML = '✅ 模型已加载');
       }
     } catch {
       alert('JSON 解析失败');
@@ -333,7 +367,7 @@ document.getElementById('file-upload')?.addEventListener('change', (e) => {
 });
 
 // =============================================
-// 🌟 2. 面板关闭按钮逻辑联动 FAB 菜单
+// 🌟 面板关闭按钮逻辑联动 FAB 菜单
 // =============================================
 document.getElementById('btn-close-multi')?.addEventListener('click', () => {
   document.getElementById('multimeter-ui')?.classList.add('hidden');
@@ -351,27 +385,29 @@ document.getElementById('btn-close-net')?.addEventListener('click', () => {
   document.getElementById('tool-network')?.classList.remove('active');
 });
 
+document.getElementById('btn-close-nickel')?.addEventListener('click', () => switchTool('pointer'));
+
 // 🔥 点焊 CAM 仿真控制器
-const btnPlay = document.getElementById('btn-weld-play') as HTMLButtonElement;
-const btnPrev = document.getElementById('btn-weld-prev') as HTMLButtonElement;
-const btnNext = document.getElementById('btn-weld-next') as HTMLButtonElement;
+const btnPlay = document.getElementById('btn-weld-play') as HTMLButtonElement | null;
+const btnPrev = document.getElementById('btn-weld-prev') as HTMLButtonElement | null;
+const btnNext = document.getElementById('btn-weld-next') as HTMLButtonElement | null;
 
 engine.welder.onStepChange = (step, total, currentCellId) => {
   const percent = total === 0 ? 0 : (step / total) * 100;
-  document.getElementById('weld-progress-bar')!.style.width = `${percent}%`;
-  document.getElementById('weld-step-text')!.innerText = `Step ${step} / ${total}`;
-  document.getElementById('weld-target-id')!.innerHTML = `目标电芯: <strong style="color:#f97316">${currentCellId}</strong>`;
+  document.getElementById('weld-progress-bar')?.style.setProperty('width', `${percent}%`);
+  document.getElementById('weld-step-text') && (document.getElementById('weld-step-text')!.innerText = `Step ${step} / ${total}`);
+  document.getElementById('weld-target-id') && (document.getElementById('weld-target-id')!.innerHTML = `目标电芯: <strong style="color:#f97316">${currentCellId}</strong>`);
 
-  if (step >= total && total > 0) {
+  if (step >= total && total > 0 && btnPlay) {
     btnPlay.innerHTML = '↺';
   }
 };
 
 engine.welder.onStatusChange = (status) => {
-  document.getElementById('weld-status')!.innerHTML = status;
+  document.getElementById('weld-status') && (document.getElementById('weld-status')!.innerHTML = status);
 };
 
-btnPlay.addEventListener('click', () => {
+btnPlay?.addEventListener('click', () => {
   if (btnPlay.innerHTML.includes('↺')) {
     const lastId = (engine.welder as any).lastBusbarId;
     if (lastId) {
@@ -388,12 +424,44 @@ btnPlay.addEventListener('click', () => {
   }
 });
 
-btnPrev.addEventListener('click', () => {
+btnPrev?.addEventListener('click', () => {
   engine.welder.prevStep();
-  btnPlay.innerHTML = '▶';
+  btnPlay && (btnPlay.innerHTML = '▶');
 });
 
-btnNext.addEventListener('click', () => {
+btnNext?.addEventListener('click', () => {
   engine.welder.nextStep();
-  btnPlay.innerHTML = '▶';
+  btnPlay && (btnPlay.innerHTML = '▶');
+});
+
+// 镍片排布播放器控制
+engine.nickelPlanner.onProgress = (step, total, info) => {
+  const percent = total === 0 ? 0 : (step / total) * 100;
+  document.getElementById('nickel-progress-bar')?.style.setProperty('width', `${percent}%`);
+  document.getElementById('nickel-step-text') && (document.getElementById('nickel-step-text')!.innerText = `已贴装 ${step} / ${total} 条`);
+  document.getElementById('nickel-info-text') && (document.getElementById('nickel-info-text')!.innerText = info);
+
+  if (step >= total && total > 0) {
+    document.getElementById('btn-nickel-play') && (document.getElementById('btn-nickel-play')!.innerHTML = '⏸');
+  }
+};
+
+engine.nickelPlanner.onStatus = (status) => {
+  document.getElementById('nickel-status') && (document.getElementById('nickel-status')!.innerHTML = status);
+};
+
+document.getElementById('btn-nickel-play')?.addEventListener('click', (e) => {
+  const btn = e.target as HTMLButtonElement;
+  if (btn.innerHTML.includes('▶')) {
+    engine.nickelPlanner.play();
+    btn.innerHTML = '⏸';
+  } else {
+    engine.nickelPlanner.pause();
+    btn.innerHTML = '▶';
+  }
+});
+
+document.getElementById('btn-nickel-reset')?.addEventListener('click', () => {
+  engine.nickelPlanner.reset();
+  document.getElementById('btn-nickel-play') && (document.getElementById('btn-nickel-play')!.innerHTML = '▶');
 });
