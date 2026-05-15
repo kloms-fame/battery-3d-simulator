@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { WeldingSimulator } from './WeldingSimulator';
 
 export class Engine3D {
     private scene: THREE.Scene;
@@ -11,6 +12,9 @@ export class Engine3D {
     private centerX: number = 0;
     private centerZ: number = 0;
     private readonly scaleFactor: number = 0.5;
+
+    // 焊接仿真器实例
+    public welder: WeldingSimulator;
 
     // 图层管理
     public groups = {
@@ -70,6 +74,9 @@ export class Engine3D {
         // 事件监听
         window.addEventListener('resize', this.onWindowResize.bind(this));
         container.addEventListener('pointerdown', this.onPointerDown.bind(this));
+
+        // 实例化焊接仿真器
+        this.welder = new WeldingSimulator(this.scene);
 
         this.animate();
     }
@@ -162,7 +169,7 @@ export class Engine3D {
     // ==========================
     // 独立坐标转换器
     // ==========================
-    private get3DPos(cx: number, cy: number) {
+    public get3DPos(cx: number, cy: number) {
         return {
             x: cx * this.scaleFactor - this.centerX,
             z: cy * this.scaleFactor - this.centerZ
@@ -247,8 +254,15 @@ export class Engine3D {
             const yPos = b.side === 'back' ? -height / 2 - 2 : height / 2 + 2;
             busbarMesh.position.set((p1.x + p2.x) / 2, yPos, (p1.z + p2.z) / 2);
             busbarMesh.lookAt(p2.x, yPos, p2.z);
-            busbarMesh.userData = { isTerminal: true, id: c1.id };
-
+            // 🌟 核心：注入 busbarId，让射线检测知道我们点的是哪条特定的金属带
+            busbarMesh.userData = {
+                isTerminal: true,
+                busbarId: b.id,  // 记录属于哪段镍片连接
+                id: c1.id,       // 继承一个电芯ID用于万用表
+                polarity: c1.polarity,
+                voltage: c1.voltage || '3.7',
+                resistance: c1.resistance || '15'
+            };
             this.groups.busbars.add(busbarMesh);
         });
     }

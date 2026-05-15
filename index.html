@@ -55,6 +55,7 @@
       <button class="fab-item" id="tool-multimeter" title="虚拟万用表测量">📟</button>
       <button class="fab-item" id="tool-bms" title="3D BMS 飞线连焊">🧵</button>
       <button class="fab-item" id="tool-network" title="开启数字孪生同步">📡</button>
+      <button class="fab-item" id="tool-welder" title="CAM 智能点焊路径仿真">🔥</button>
     </div>
     <button id="fab-main" class="fab-main" title="工具箱">🛠️</button>
   </div>
@@ -102,6 +103,39 @@
       <div id="net-status" style="margin-top: 15px; font-size: 12px; color: #fbbf24; text-align: center;">等待连接...</div>
     </div>
   </div>
+
+  <!-- 🔥 正确添加：智能点焊 CAM 仿真面板 -->
+  <div id="welder-ui" class="panel hidden draggable-panel"
+    style="bottom: 160px; right: 25px; border-color: #f97316; width: 340px;">
+    <div class="panel-header drag-handle" id="drag-header-welder">
+      <h3 style="color:#f97316; margin:0; pointer-events: none;">🔥 智能点焊 CAM 仿真</h3>
+      <span class="close-btn" id="btn-close-welder" title="关闭窗口">✖</span>
+    </div>
+    <div class="panel-content" style="text-align: center;">
+      <div id="weld-status" style="margin-bottom: 15px; font-size: 13px; color: #cbd5e1;">
+        请点击 3D 场景中的 <strong style="color:#f97316">一段灰色金属镍片</strong>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.5); height: 8px; border-radius: 4px; margin-bottom: 10px; overflow: hidden;">
+        <div id="weld-progress-bar" style="width: 0%; height: 100%; background: #f97316; transition: width 0.3s;"></div>
+      </div>
+      <div style="display:flex; justify-content: space-between; font-size:12px; color:#94a3b8; margin-bottom: 15px;">
+        <span id="weld-step-text">0 / 0</span>
+        <span id="weld-target-id">等待选择</span>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 15px; align-items: center;">
+        <button id="btn-weld-prev" class="action-btn"
+          style="border-radius: 50%; width:44px; height:44px; font-size: 16px;" disabled>⏮</button>
+        <button id="btn-weld-play" class="action-btn"
+          style="border-radius: 50%; width:56px; height:56px; border-color:#f97316; color:#f97316; font-size: 22px;"
+          disabled>▶</button>
+        <button id="btn-weld-next" class="action-btn"
+          style="border-radius: 50%; width:44px; height:44px; font-size: 16px;" disabled>⏭</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 

@@ -5,7 +5,7 @@ const engine = new Engine3D('canvas-container');
 
 let currentDoc: any = null;
 let probedCells: { id: string, voltage: number }[] = [];
-let currentTool: 'pointer' | 'multimeter' | 'bms' | 'network' = 'pointer';
+let currentTool: 'pointer' | 'multimeter' | 'bms' | 'network' | 'welder' = 'pointer';
 
 // =============================================
 // 1. UI 面板与图层控制
@@ -79,6 +79,7 @@ function makeDraggable(panelId: string, handleId: string) {
 }
 makeDraggable('multimeter-ui', 'drag-header-multi');
 makeDraggable('network-ui', 'drag-header-net');
+makeDraggable('welder-ui', 'drag-header-welder');
 
 // =============================================
 // 3. FAB 菜单 & 工具切换
@@ -91,17 +92,22 @@ document.getElementById('fab-main')?.addEventListener('click', () => {
   fabContainer.classList.toggle('open');
 });
 
-const switchTool = (tool: 'pointer' | 'multimeter' | 'bms' | 'network') => {
+const switchTool = (tool: 'pointer' | 'multimeter' | 'bms' | 'network' | 'welder') => {
   currentTool = tool;
   document.querySelectorAll('.fab-item').forEach(btn => btn.classList.remove('active'));
   document.getElementById(`tool-${tool}`)?.classList.add('active');
 
   multimeterUI.classList.toggle('hidden', tool !== 'multimeter');
   networkUI.classList.toggle('hidden', tool !== 'network');
+  document.getElementById('welder-ui')?.classList.toggle('hidden', tool !== 'welder');
 
   if (tool !== 'multimeter') {
     probedCells = [];
     engine.clearProbes();
+  }
+
+  if (tool !== 'welder') {
+    engine.welder.reset();
   }
 
   fabContainer.classList.remove('open');
@@ -111,6 +117,9 @@ document.getElementById('tool-pointer')?.addEventListener('click', () => switchT
 document.getElementById('tool-multimeter')?.addEventListener('click', () => switchTool('multimeter'));
 document.getElementById('tool-bms')?.addEventListener('click', () => switchTool('bms'));
 document.getElementById('tool-network')?.addEventListener('click', () => switchTool('network'));
+document.getElementById('tool-welder')?.addEventListener('click', () => switchTool('welder'));
+
+document.getElementById('btn-close-welder')?.addEventListener('click', () => switchTool('pointer'));
 
 // =============================================
 // 4. 拓扑电压计算
@@ -155,6 +164,23 @@ function calculateTopologyVoltage(idA: string, idB: string, doc: any): string {
 engine.onCellClick((cellData, intersectPoint, normal) => {
   if (!currentDoc) return;
 
+  // 🔥 点焊模式：点击镍片生成路径
+  if (currentTool === 'welder') {
+    if (cellData.busbarId) {
+      (engine.welder as any).lastBusbarId = cellData.busbarId;
+      engine.welder.calculateOptimalPath(cellData.busbarId, currentDoc, engine.get3DPos.bind(engine));
+
+      btnPlay.removeAttribute('disabled');
+      btnPrev.removeAttribute('disabled');
+      btnNext.removeAttribute('disabled');
+      btnPlay.innerHTML = '▶';
+    } else {
+      engine.welder.onStatusChange!('⚠️ 请点击灰色的金属镍片带，不要点电芯外壳');
+    }
+    return;
+  }
+
+  // 原万用表逻辑
   if (currentTool === 'multimeter') {
     const infoBox = document.getElementById('cell-info-box')!;
     infoBox.classList.remove('hidden');
@@ -323,4 +349,51 @@ document.getElementById('btn-close-multi')?.addEventListener('click', () => {
 document.getElementById('btn-close-net')?.addEventListener('click', () => {
   document.getElementById('network-ui')?.classList.add('hidden');
   document.getElementById('tool-network')?.classList.remove('active');
+});
+
+// 🔥 点焊 CAM 仿真控制器
+const btnPlay = document.getElementById('btn-weld-play') as HTMLButtonElement;
+const btnPrev = document.getElementById('btn-weld-prev') as HTMLButtonElement;
+const btnNext = document.getElementById('btn-weld-next') as HTMLButtonElement;
+
+engine.welder.onStepChange = (step, total, currentCellId) => {
+  const percent = total === 0 ? 0 : (step / total) * 100;
+  document.getElementById('weld-progress-bar')!.style.width = `${percent}%`;
+  document.getElementById('weld-step-text')!.innerText = `Step ${step} / ${total}`;
+  document.getElementById('weld-target-id')!.innerHTML = `目标电芯: <strong style="color:#f97316">${currentCellId}</strong>`;
+
+  if (step >= total && total > 0) {
+    btnPlay.innerHTML = '↺';
+  }
+};
+
+engine.welder.onStatusChange = (status) => {
+  document.getElementById('weld-status')!.innerHTML = status;
+};
+
+btnPlay.addEventListener('click', () => {
+  if (btnPlay.innerHTML.includes('↺')) {
+    const lastId = (engine.welder as any).lastBusbarId;
+    if (lastId) {
+      engine.welder.calculateOptimalPath(lastId, currentDoc, engine.get3DPos.bind(engine));
+      engine.welder.play();
+      btnPlay.innerHTML = '⏸';
+    }
+  } else if (btnPlay.innerHTML.includes('▶')) {
+    engine.welder.play();
+    btnPlay.innerHTML = '⏸';
+  } else {
+    engine.welder.pause();
+    btnPlay.innerHTML = '▶';
+  }
+});
+
+btnPrev.addEventListener('click', () => {
+  engine.welder.prevStep();
+  btnPlay.innerHTML = '▶';
+});
+
+btnNext.addEventListener('click', () => {
+  engine.welder.nextStep();
+  btnPlay.innerHTML = '▶';
 });
