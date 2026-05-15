@@ -7,6 +7,11 @@ export class Engine3D {
     private renderer: THREE.WebGLRenderer;
     private controls: OrbitControls;
 
+    // 新增：中心坐标与缩放系数（用于局部无损刷新）
+    private centerX: number = 0;
+    private centerZ: number = 0;
+    private readonly scaleFactor: number = 0.5;
+
     // 图层管理
     public groups = {
         cells: new THREE.Group(),
@@ -118,6 +123,7 @@ export class Engine3D {
         if (!validHit || !this.onCellClickHandler) return;
 
         const normalMatrix = new THREE.Matrix3().getNormalMatrix(validHit.object.matrixWorld);
+        if (!validHit.face) return;
         const worldNormal = validHit.face.normal.clone().applyMatrix3(normalMatrix).normalize();
 
         this.onCellClickHandler(validHit.object.userData, validHit.point, worldNormal);
@@ -154,30 +160,25 @@ export class Engine3D {
     }
 
     // ==========================
+    // 独立坐标转换器
+    // ==========================
+    private get3DPos(cx: number, cy: number) {
+        return {
+            x: cx * this.scaleFactor - this.centerX,
+            z: cy * this.scaleFactor - this.centerZ
+        };
+    }
+
+    // ==========================
     // BMS 渲染（带主板）
     // ==========================
     public renderBMS(doc: any) {
         this.groups.bms.clear();
         if (!doc.cells || !doc.bmsWires || doc.bmsWires.length === 0) return;
 
-        const scale = 0.5;
-        let sumX = 0, sumY = 0;
-        doc.cells.forEach((c: any) => {
-            sumX += c.cx * scale;
-            sumY += c.cy * scale;
-        });
-
-        const centerX = sumX / doc.cells.length;
-        const centerZ = sumY / doc.cells.length;
-
-        const get3DPos = (cx: number, cy: number) => ({
-            x: cx * scale - centerX,
-            z: cy * scale - centerZ
-        });
-
         const height = 65;
-        const xs = doc.cells.map((c: any) => get3DPos(c.cx, c.cy).x);
-        const zs = doc.cells.map((c: any) => get3DPos(c.cx, c.cy).z);
+        const xs = doc.cells.map((c: any) => this.get3DPos(c.cx, c.cy).x);
+        const zs = doc.cells.map((c: any) => this.get3DPos(c.cx, c.cy).z);
         const minX = Math.min(...xs);
         const maxX = Math.max(...xs);
         const maxZ = Math.max(...zs);
@@ -205,7 +206,7 @@ export class Engine3D {
             const cell = doc.cells.find((c: any) => c.id === bw.cellId);
             if (!cell) return;
 
-            const p = get3DPos(cell.cx, cell.cy);
+            const p = this.get3DPos(cell.cx, cell.cy);
             const curve = new THREE.CubicBezierCurve3(
                 new THREE.Vector3(p.x, height / 2 + 3, p.z),
                 new THREE.Vector3(p.x, height / 2 + 45, p.z),
@@ -220,6 +221,59 @@ export class Engine3D {
 
             this.groups.bms.add(wire);
         });
+    }
+
+    // ==========================
+    // 独立镍片渲染
+    // ==========================
+    public renderBusbars(doc: any) {
+        this.groups.busbars.clear();
+        if (!doc.busbars || doc.busbars.length === 0) return;
+
+        const nickelMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 1.0 });
+        const height = 65;
+
+        doc.busbars.forEach((b: any) => {
+            const c1 = doc.cells.find((c: any) => c.id === b.from);
+            const c2 = doc.cells.find((c: any) => c.id === b.to);
+            if (!c1 || !c2) return;
+
+            const p1 = this.get3DPos(c1.cx, c1.cy);
+            const p2 = this.get3DPos(c2.cx, c2.cy);
+            const distance = Math.hypot(p2.x - p1.x, p2.z - p1.z);
+            if (distance < 0.1) return;
+
+            const busbarMesh = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, distance), nickelMat);
+            const yPos = b.side === 'back' ? -height / 2 - 2 : height / 2 + 2;
+            busbarMesh.position.set((p1.x + p2.x) / 2, yPos, (p1.z + p2.z) / 2);
+            busbarMesh.lookAt(p2.x, yPos, p2.z);
+            busbarMesh.userData = { isTerminal: true, id: c1.id };
+
+            this.groups.busbars.add(busbarMesh);
+        });
+    }
+
+    // ==========================
+    // 高性能局部坐标刷新
+    // ==========================
+    public refreshPositions(doc: any) {
+        if (!doc || !doc.cells) return;
+        const height = 65;
+
+        doc.cells.forEach((c: any) => {
+            const p = this.get3DPos(c.cx, c.cy);
+
+            // 更新电芯位置
+            const cell3D = this.groups.cells.children.find(obj => obj.userData.id === c.id);
+            if (cell3D) cell3D.position.set(p.x, 0, p.z);
+
+            // 更新标签位置
+            const label = this.groups.labels.children.find(obj => obj.userData.id === c.id);
+            if (label) label.position.set(p.x, height / 2 + 15, p.z);
+        });
+
+        this.renderBusbars(doc);
+        this.renderBMS(doc);
     }
 
     // ==========================
@@ -252,24 +306,26 @@ export class Engine3D {
     }
 
     // ==========================
-    // 加载电池包
+    // 加载电池包（完整版）
     // ==========================
     public loadBatteryPack(doc: any): void {
         Object.values(this.groups).forEach(g => g.clear());
 
+        // 防弹拦截
+        if (!doc || !doc.cells || !Array.isArray(doc.cells) || doc.cells.length === 0) {
+            return;
+        }
+
         const cells = doc.cells;
-        if (!cells || cells.length === 0) return;
 
-        const scale = 0.5;
+        // 计算全局中心
         let sumX = 0, sumY = 0;
-        cells.forEach((c: any) => { sumX += c.cx * scale; sumY += c.cy * scale; });
-        const centerX = sumX / cells.length;
-        const centerZ = sumY / cells.length;
-
-        const get3DPos = (cx: number, cy: number) => ({
-            x: cx * scale - centerX,
-            z: cy * scale - centerZ
+        cells.forEach((c: any) => {
+            sumX += c.cx * this.scaleFactor;
+            sumY += c.cy * this.scaleFactor;
         });
+        this.centerX = sumX / cells.length;
+        this.centerZ = sumY / cells.length;
 
         const radius = 9;
         const height = 65;
@@ -279,12 +335,12 @@ export class Engine3D {
         const posMat = new THREE.MeshStandardMaterial({ color: '#ef4444', roughness: 0.3, metalness: 0.5 });
         const negMat = new THREE.MeshStandardMaterial({ color: '#3b82f6', roughness: 0.3, metalness: 0.5 });
         const wrapMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.8 });
-        const nickelMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 1.0 });
 
         // 1. 电芯
         cells.forEach((c: any) => {
-            const p = get3DPos(c.cx, c.cy);
+            const p = this.get3DPos(c.cx, c.cy);
             const cell3D = new THREE.Group();
+            cell3D.userData = { id: c.id };
             cell3D.position.set(p.x, 0, p.z);
 
             const wrapper = new THREE.Mesh(cellGeo, wrapMat);
@@ -307,42 +363,12 @@ export class Engine3D {
 
             const label = this.createSpriteLabel(c.id);
             label.position.set(p.x, height / 2 + 15, p.z);
+            label.userData = { id: c.id };
             this.groups.labels.add(label);
         });
 
-        // 2. 镍片
-        if (doc.busbars) {
-            doc.busbars.forEach((b: any) => {
-                const c1 = cells.find((c: any) => c.id === b.from);
-                const c2 = cells.find((c: any) => c.id === b.to);
-                if (!c1 || !c2) return;
-
-                const p1 = get3DPos(c1.cx, c1.cy);
-                const p2 = get3DPos(c2.cx, c2.cy);
-                const length = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-
-                const busbar = new THREE.Mesh(
-                    new THREE.BoxGeometry(8, 0.3, length),
-                    nickelMat
-                );
-
-                const yPos = b.side === 'back' ? -height / 2 - 2 : height / 2 + 2;
-                busbar.position.set((p1.x + p2.x) / 2, yPos, (p1.z + p2.z) / 2);
-                busbar.lookAt(p2.x, yPos, p2.z);
-
-                busbar.userData = {
-                    isTerminal: true,
-                    id: c1.id,
-                    polarity: c1.polarity,
-                    voltage: c1.voltage || '3.7',
-                    resistance: c1.resistance || '15'
-                };
-
-                this.groups.busbars.add(busbar);
-            });
-        }
-
-        // 3. BMS（新版）
+        // 2. 镍片 + BMS
+        this.renderBusbars(doc);
         this.renderBMS(doc);
     }
 
