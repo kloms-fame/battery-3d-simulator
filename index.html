@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battery Pack 3D Simulator</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="ui-panel">
+    <h1 class="brand">⚡ PACK SIMULATOR 3D</h1>
+    <p class="subtitle">Digital Twin Engine</p>
+
+    <div class="control-group">
+      <label for="file-upload" class="custom-file-upload">
+        📂 导入 Easy_Battery_Tool JSON
+      </label>
+      <input id="file-upload" type="file" accept=".json" />
+    </div>
+
+    <div id="stats-display" class="stats-box">
+      等待导入模型...
+    </div>
+  </div>
+
+  <div id="multimeter-ui" class="hidden">
+    <div class="lcd-screen">
+      <span class="lcd-mode">DC Voltage</span>
+      <span class="lcd-value" id="lcd-v">0.00</span> <span class="lcd-unit">V</span>
+    </div>
+    <div class="probe-status">请使用探针点击电芯极耳</div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>
